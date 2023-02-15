@@ -15,7 +15,8 @@ CORS(app)
 # app.config["SQLALCHEMY_DATABASE_URI"] = database
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://admin:adminizaus@localhost/flasknote_db"
-app.config["SECRET_KEY"] = "dummytestapp74"
+# app.config["SECRET_KEY"] = "dummytestapp74"
+
 db.init_app(app)
 
 class MyNoteModel(db.Model):
