@@ -3,4 +3,3 @@ flask-restful
 flask-sqlalchemy
 flask-mysqldb
 flask-cors
-flask_whooshalchemy
