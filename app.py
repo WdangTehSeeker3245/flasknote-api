@@ -17,6 +17,7 @@ CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://admin:adminizaus@localhost/flasknote_db"
 # app.config["SECRET_KEY"] = "dummytestapp74"
 
+
 db.init_app(app)
 
 class MyNoteModel(db.Model):
@@ -122,12 +123,34 @@ class MyNoteUpdate(Resource):
         }
         return response, 200
 
+class MyNoteSearch(Resource):
+    def get(self):
+        search = request.args.get("search")
+
+        query = MyNoteModel.query.filter(MyNoteModel.title_note.like('%'+search+'%') | MyNoteModel.html_note.like('%'+search+'%')).all()
+
+        output = [
+            {
+                "id"   : data.id,
+                "title_note" : data.title_note,
+            } 
+            for data in query
+        ]
+
+        response = {
+            "code" : 200,
+            "msg"  : "Query Data Success",
+            "data" : output
+        }
+        
+        return make_response(jsonify(response),200)
 
 
 api.add_resource(MyNoteInsert,'/api/insertnote', methods=["POST"])
 api.add_resource(MyNoteList,'/api/listnote', methods=["GET"])
 api.add_resource(MyNoteView,'/api/viewnote/<id>', methods=["GET"])
 api.add_resource(MyNoteUpdate,'/api/updatenote/<id>', methods=["PUT","DELETE"])
+api.add_resource(MyNoteSearch,'/api/searchnote', methods=["GET"])
 
 
 if __name__ == '__main__':
