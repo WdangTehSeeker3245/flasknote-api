@@ -1,5 +1,6 @@
 from flask import Flask,request,make_response,jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 from flask_restful import Api,Resource
 from flask_cors import CORS
 import os
@@ -14,9 +15,7 @@ CORS(app)
 # database = "sqlite:///" + os.path.join(basedir,"db.sqlite")
 # app.config["SQLALCHEMY_DATABASE_URI"] = database
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://admin:adminizaus@localhost/flasknote_db"
-# app.config["SECRET_KEY"] = "dummytestapp74"
-
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://admin:izausadmin@localhost/flasknote_db"
 
 db.init_app(app)
 
@@ -40,117 +39,280 @@ with app.app_context():
 
 class MyNoteInsert(Resource):
     def post(self):
-        dataTitleNote = request.form["title_note"]
-        dataHtmlNote = request.form["html_note"]
+        try:
+            dataTitleNote = request.json["title_note"]
+            dataHtmlNote = request.json["html_note"]
 
-        mynote = MyNoteModel(
-            title_note=dataTitleNote,
-            html_note=dataHtmlNote
-        )
-        mynote.save()
+            # Validate the data
+            if not dataTitleNote:
+                response = {
+                    "code" : 400,
+                    "error" : "Title is required."
+                }
+                return make_response(jsonify(response), 400)
+            if not dataHtmlNote:
+                response = {
+                    "code" : 400,
+                    "error" : "Content is required."
+                }
+                return make_response(jsonify(response), 400)
+            
+            #Check Note Exist
+            if MyNoteModel.query.filter_by(title_note=dataTitleNote).first():
+                response = {
+                    "code" : 409,
+                    "error" : "Item already exists."
+                }
+                return make_response(jsonify(response), 409)
 
-        response = {
-            "msg":"data berhasil dimasukan",
-            "code": 200
-        }
+            # Process Data
+            mynote = MyNoteModel(
+                title_note=dataTitleNote,
+                html_note=dataHtmlNote
+            )
+            mynote.save()
 
-        return make_response(jsonify(response), 200)
+            response = {
+                "msg":"Data Successfully Inserted",
+                "code": 200
+            }
+
+            return make_response(jsonify(response), 200)
+
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
+        
+
+        except Exception as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
 
 
 class MyNoteList(Resource):
     def get(self):
-        query = MyNoteModel.query.all()
+        try :
+            query = MyNoteModel.query.all()
 
-        output = [
-            {
-                "id"   : data.id,
-                "title_note" : data.title_note,
-            } 
-            for data in query
-        ]
-
-        response = {
-            "code" : 200,
-            "msg"  : "Query Data Success",
-            "data" : output
-        }
-
-        return make_response(jsonify(response), 200)
+            # Process Data
+            output = [
+                {
+                    "id"   : data.id,
+                    "title_note" : data.title_note,
+                } 
+                for data in query
+            ]
+        
+            response = {
+                "code" : 200,
+                "data" : output
+            }
+            return make_response(jsonify(response), 200)
+        
+        except Exception as e:
+            
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
 
 class MyNoteView(Resource):
     def get(self,id):
-        query = MyNoteModel.query.filter_by(id=id).first()
+        try :
+            query = MyNoteModel.query.filter_by(id=id).first()
 
-        output = {
-                "id"   : query.id,
-                "title_note" : query.title_note,
-                "html_note" : query.html_note
-        }
+            # Check if the item exists
+            if not query:
+                response = {
+                    "code" : 404,
+                    "error" : "Note not found."
+                }
+                return make_response(jsonify(response), 404)
 
-        response = {
-            "code" : 200,
-            "msg"  : "Query Data Success",
-            "data" : output
-        }
+            # Process Data
+            output = {
+                    "id"   : query.id,
+                    "title_note" : query.title_note,
+                    "html_note" : query.html_note
+            }
 
-        return make_response(jsonify(response), 200)
+            response = {
+                "code" : 200,
+                "data" : output
+            }
+
+            return make_response(jsonify(response), 200)
+
+        except Exception as e:
+            
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
 
 class MyNoteUpdate(Resource):
     def put(self,id):
-        query = MyNoteModel.query.get(id)
-        editTitleNote = request.form["title_note"]
-        editHtmlNote = request.form["html_note"]
+        try:
+            editTitleNote = request.json["title_note"]
+            editHtmlNote = request.json["html_note"]
 
-        query.title_note = editTitleNote
-        query.html_note = editHtmlNote
-        db.session.commit()
+            query = MyNoteModel.query.get(id)
 
-        response = {
-            "msg":"data berhasil diedit",
-            "code": 200
-        }
-        return response, 200
+            # Check if the item exists
+            if not query:
+                response = {
+                    "code" : 404,
+                    "error" : "Note not found."
+                }
+                return make_response(jsonify(response), 404)
+
+            # Validate the data
+            if not editTitleNote:
+                response = {
+                    "code" : 400,
+                    "error" : "Title is required."
+                }
+                return make_response(jsonify(response), 400)
+            if not editHtmlNote:
+                response = {
+                    "code" : 400,
+                    "error" : "Content is required."
+                }
+                return make_response(jsonify(response), 400)
+
+            #Check Note Exist
+            if MyNoteModel.query.filter_by(title_note=editTitleNote).first():
+                response = {
+                    "code" : 409,
+                    "error" : "Note Title already exists."
+                }
+                return make_response(jsonify(response), 409)
+                
+            # Process Data
+            query.title_note = editTitleNote
+            query.html_note = editHtmlNote
+            db.session.commit()
+
+            response = {
+                "msg":"Data Successfully Updated",
+                "code": 200
+            }
+            return make_response(jsonify(response), 200)
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
+        
+
+        except Exception as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
+        
     
     def delete(self,id):
-        queryData = MyNoteModel.query.get(id)
-        
-        db.session.delete(queryData)
-        db.session.commit()
+        try:
+            query = MyNoteModel.query.get(id)
 
-        response = {
-            "msg":"data berhasil dihapus",
-            "code": 200
-        }
-        return response, 200
+            # Check if the item exists
+            if not query:
+                response = {
+                    "code" : 404,
+                    "error" : "Note not found."
+                }
+                return make_response(jsonify(response), 404)
+            
+            # Process Data
+            db.session.delete(query)
+            db.session.commit()
+
+            response = {
+                "msg":"Data Successfully Deleted",
+                "code": 200
+            }
+            return make_response(jsonify(response), 200)
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
+        
+
+        except Exception as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
 
 class MyNoteSearch(Resource):
     def get(self):
-        search = request.args.get("search")
+        try :
+            search = request.args.get("title_note")
 
-        query = MyNoteModel.query.filter(MyNoteModel.title_note.like('%'+search+'%') | MyNoteModel.html_note.like('%'+search+'%')).all()
+            query = MyNoteModel.query.filter(MyNoteModel.title_note.like('%'+search+'%') | MyNoteModel.html_note.like('%'+search+'%')).all()
 
-        output = [
-            {
-                "id"   : data.id,
-                "title_note" : data.title_note,
-            } 
-            for data in query
-        ]
+            #Process Data
+            output = [
+                {
+                    "id"   : data.id,
+                    "title_note" : data.title_note,
+                } 
+                for data in query
+            ]
 
-        response = {
-            "code" : 200,
-            "msg"  : "Query Data Success",
-            "data" : output
-        }
+            response = {
+                "code" : 200,
+                "data" : output
+            }
+            
+            return make_response(jsonify(response),200)
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
         
-        return make_response(jsonify(response),200)
+
+        except Exception as e:
+            db.session.rollback()
+            response = {
+                "code" : 500,
+                "error" : str(e)
+            }
+            return make_response(jsonify(response), 500)
 
 
-api.add_resource(MyNoteInsert,'/api/insertnote', methods=["POST"])
-api.add_resource(MyNoteList,'/api/listnote', methods=["GET"])
-api.add_resource(MyNoteView,'/api/viewnote/<id>', methods=["GET"])
-api.add_resource(MyNoteUpdate,'/api/updatenote/<id>', methods=["PUT","DELETE"])
-api.add_resource(MyNoteSearch,'/api/searchnote', methods=["GET"])
+api.add_resource(MyNoteInsert,'/api/notes', methods=["POST"])
+api.add_resource(MyNoteList,'/api/notes', methods=["GET"])
+api.add_resource(MyNoteView,'/api/note/<id>', methods=["GET"])
+api.add_resource(MyNoteUpdate,'/api/note/<id>', methods=["PUT","DELETE"])
+api.add_resource(MyNoteSearch,'/api/search', methods=["GET"])
 
 
 if __name__ == '__main__':
